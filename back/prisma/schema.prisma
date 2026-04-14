@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum CashStatus {
+  OPEN
+  CLOSED
+}
+
+enum MovementType {
+  INCOME
+  EXPENSE
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  OTHER
+}
+
+enum ProductType {
+  UNIT
+  WEIGHT
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum SaleEventType {
+  ITEM_ADDED
+  ITEM_REMOVED
+  ITEM_UPDATED
+  SALE_CANCELLED
+  PAYMENT_ADDED
+}
+
+// ================= USERS =================
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  password  String
+  role      UserRole
+
+  currentCashBoxId Int?
+
+  createdAt DateTime @default(now())
+
+  sales     Sale[]
+  cashBoxes CashBox[]
+}
+
+// ================= CASH =================
+model CashBox {
+  id            Int        @id @default(autoincrement())
+  userId        Int
+  user          User       @relation(fields: [userId], references: [id])
+
+  status        CashStatus
+  openedAt      DateTime   @default(now())
+  closedAt      DateTime?
+
+  initialAmount Float
+  finalAmount   Float?
+
+  movements     CashMovement[]
+  sales         Sale[]
+}
+
+model CashMovement {
+  id        Int          @id @default(autoincrement())
+  cashBoxId Int
+  cashBox   CashBox      @relation(fields: [cashBoxId], references: [id])
+
+  type      MovementType
+  amount    Float
+  reason    String?
+
+  createdAt DateTime     @default(now())
+}
+
+// ================= PRODUCTS =================
+model Product {
+  id        Int          @id @default(autoincrement())
+  name      String
+
+  price     Float
+  type      ProductType
+
+  barcode   String?      @unique
+  plu       String?      @unique
+
+  isActive  Boolean      @default(true)
+
+  createdAt DateTime     @default(now())
+
+  saleItems SaleItem[]
+
+  @@index([barcode])
+  @@index([plu])
+}
+
+// ================= SALES =================
+model Sale {
+  id         Int         @id @default(autoincrement())
+
+  userId     Int
+  user       User        @relation(fields: [userId], references: [id])
+
+  cashBoxId  Int
+  cashBox    CashBox     @relation(fields: [cashBoxId], references: [id])
+
+  status     SaleStatus  @default(PENDING)
+
+  total      Float       @default(0)
+  totalCalculated Float?
+
+  createdAt  DateTime    @default(now())
+
+  items      SaleItem[]
+  payments   Payment[]
+  events     SaleEvent[]
+}
+
+// ================= SALE ITEMS =================
+model SaleItem {
+  id          Int     @id @default(autoincrement())
+
+  saleId      Int
+  sale        Sale    @relation(fields: [saleId], references: [id])
+
+  productId   Int
+  product     Product @relation(fields: [productId], references: [id])
+
+  quantity    Float
+  unitPrice   Float
+  subtotal    Float
+
+  // verdulería
+  weight      Float?
+  priceFromScale Float?
+
+  systemPrice Float?
+  priceDifference Float?
+}
+
+// ================= PAYMENTS =================
+model Payment {
+  id        Int           @id @default(autoincrement())
+
+  saleId    Int
+  sale      Sale          @relation(fields: [saleId], references: [id])
+
+  method    PaymentMethod
+  amount    Float
+
+  createdAt DateTime      @default(now())
+}
+
+// ================= EVENTS =================
+model SaleEvent {
+  id        Int            @id @default(autoincrement())
+
+  saleId    Int
+  sale      Sale           @relation(fields: [saleId], references: [id])
+
+  type      SaleEventType
+  payload   Json
+
+  createdAt DateTime       @default(now())
+}
